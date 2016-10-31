@@ -1,3 +1,13 @@
+//Uncoupling is a class designed mostly around SndBuf with a liiiiitle bit of LiSa thrown in (still experimental atm, but getting better!).
+//The purpose of this tool was to create a way of arranging/sequencing/chopping samples that was quick and easy to get interesting results out of.
+//Samples are great, but prior to building this, I found them a bit of a pain to impliment in ChucK, and super hard to cut in the way I was used to.
+//In building this, I wanted to create a way of cutting samples that seemed idiomatic to ChucK - hence, most of these functions involve a degree of 
+//randomness, if not an algorithmic approach. As this can be unmusical at times, I've added a few different ways of controlling the randomness, which 
+//yeilded it a lot more versitile than i initially thought it was going to be. It's slowly becoming quite a cool way of livecoding interesting sounding
+//sample patternes quickly, and I'm intending to continue developing it over the next few weeks to fix a few bugs, include MIDI support (so it can be edited 
+//and performed live with a MIDI controller) and add a few more features. Hopefully by the end I'll have a fairly "all-in-one" livecoding sampler tool.
+//(Instant Four Tet/Actress!!)
+
 public class Uncoupling{
     //Setup
     SndBuf Sample;
