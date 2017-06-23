@@ -1,0 +1,103 @@
+//Buggy at the moment but mostly works
+ #include <Bounce.h>
+ #include <LiquidCrystal.h>
+ #include <Encoder.h>
+ 
+
+ LiquidCrystal lcd(5, 6, 7, 8, 9, 10);
+ int val;
+ int val2;
+ int prevVal;
+  int prevVal2;
+ int switchPin = 11; 
+ int state = HIGH;
+ int prevState = HIGH;
+ int encSwitchState = false;
+ Encoder myEnc(3, 4);
+ Bounce bouncer = Bounce(switchPin, 50); 
+
+ void setup() { 
+   pinMode(switchPin, INPUT);
+   Serial.begin (9600);
+  lcd.begin(16, 2);                       //set up the LCD's number of rows and columns
+  lcd.print("LCD Button Test");           //print
+  lcd.setCursor(0, 1);                    //set the cursor to column 0, line 1. (note: line 1 is the second row, since counting begins with 0)
+  lcd.print("Hello ");                    //print line 2, pt. 1
+ } 
+
+ void loop() {
+  menu1();
+ } 
+ 
+
+ void menu1(){
+  val = myEnc.read();  
+ 
+  bouncer.update(); //Read button
+  state = bouncer.read();
+  if(state == LOW && prevState == HIGH){encSwitchState = true;}
+  prevState = state;
+  
+  if((val%4) == 0 && prevVal != val){
+      switch (val) 
+      {
+      case 0:
+        Serial.println("Sequence");
+        //if(encSwitchState == true){menu2();}
+        break;
+      case 4:
+        Serial.println("MIDI");
+        break;
+      case 8:
+        Serial.println("Sample");
+        break;
+      case -4:
+        Serial.println("Sample");
+        break;
+      case -8:
+        Serial.println("MIDI");
+        break;
+      default: 
+        // if nothing else matches, do the default
+        // default is optional
+      break;
+    }
+  }
+  prevVal = val;
+  if(val >= 12 || val <= -12)
+  {myEnc.write(0);}
+  delay(10);
+  }
+//this function isn't working yet 
+/*
+ void menu2(){
+  val2 = (myEnc.read()+24); 
+  if((val2%4) == 0 && prevVal != val){
+      switch (val2) 
+      {
+      case 24:
+        Serial.println("Sample Length");
+        break;
+      case 28:
+        Serial.println("Random?");
+        break;
+      case 32:
+        Serial.println("Loop?");
+        break;
+      case 20:
+        Serial.println("Random?");
+        break;
+      case 16:
+        Serial.println("Loop?");
+        break;
+      default: 
+        // if nothing else matches, do the default
+        // default is optional
+      break;
+    }
+  }
+  prevVal2 = val2;
+  if(val >= 36 || val <= 12)
+  {myEnc.write(24);}
+  delay(10);
+  }*/
