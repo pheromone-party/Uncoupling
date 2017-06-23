@@ -1,0 +1,145 @@
+//adding the libraries needed
+#include <Wire.h>
+#include <SPI.h>
+#include <SD.h>
+#include <SerialFlash.h>
+#include <Audio.h>
+#include <MIDI.h>
+
+//setting up the audio chain
+AudioPlaySdWav           playSdWav1;
+AudioMixer4              mixer1;
+AudioConnection          patchCord1(playSdWav1, 0, mixer1, 0);
+AudioConnection          patchCord2(playSdWav1, 1, mixer1, 1);
+AudioOutputI2S           i2s1;
+AudioConnection          patchCord3(mixer1, 0, i2s1, 0);
+AudioConnection          patchCord4(mixer1, 0, i2s1, 1);
+AudioControlSGTL5000     sgtl5000_1;
+
+// SD set up pins for 3.6 sd card reader use
+#define SDCARD_CS_PIN    BUILTIN_SDCARD
+#define SDCARD_MOSI_PIN  11  // not actually used
+#define SDCARD_SCK_PIN   13  // not actually used
+
+int sequencer[] = {1, 2, 2, 1, 1, 2, 2, 2, 1, 1, 2, 1, 2, 1, 2, 1};           //Main sequencer array
+int midiSequencer[] = {37, 0, 0, 41, 0, 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 0};    //MIDI sequence array
+int memoryArray[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};         //Allocating space for remembering a loop
+int tempoMs = 65;                                                             //125ms == semiquavers @ 120
+int arraySize = 16;                                                           //telling the loop how many steps to read through
+int lowerRandom = 20000;                                                       //Sample start point/lower bound
+int upperRandom =100000;                                                       //Sample end point/upper bound
+int seekSet = 50;                                                            //Setting the start point for non-random playback
+int prevMidiVal = 0;                                                          //MIDI placeholder
+int stopStart = true;                                                         //Stop/start integer
+int seekVal = 0;                                                              //Allocating memory for random number
+int zigZagSwitch = true;                                                      //On/off button for Zigzag sequencing
+int remember = true;                                                          //On/off button for looping/memory sequence
+int randomOn = true;                                                          //On/off button for random start points
+int rememberFlagGlobal = false;                                               //A flag that's currently not used. DW about it. 
+
+
+void setup() {
+  Serial.begin(9600);                                                         //Setup. Basically just enabling everything I need. If it can't find an SD card it will tell you. 
+  AudioMemory(8);
+  sgtl5000_1.enable();
+  sgtl5000_1.volume(0.5);
+  SPI.setMOSI(SDCARD_MOSI_PIN);
+  SPI.setSCK(SDCARD_SCK_PIN);
+  if (!(SD.begin(SDCARD_CS_PIN))) {
+    while (1) {
+      Serial.println("Unable to access the SD card");
+      delay(500);
+    }
+  }
+  mixer1.gain(0, 1);
+  mixer1.gain(1, 1);
+  sequenceMemory();                                                           //Generating a random sequence of start points on boot. This is what gets used for the loop memory feature.
+  delay(10);
+}
+//----------------------------------------------------------------------------------------------------------------------------------main loop here
+void loop() {
+  if (stopStart == true) {
+    looper(arraySize, zigZagSwitch, memoryArray, remember, rememberFlagGlobal, randomOn, seekSet);                                       //If start is enabled, jump to looper function
+    //call here for once every loop
+  }
+  //if(usbSeqIn == true)
+  // {usbMIDI.read(); steps(INSERT A WHOLE BUNCH OF MIDI ARGUMENTS HERE)
+}
+//-----------------------------------------------------------------------------------------------------------------------------------per step function here
+void steps(int sequencer[], int midiSequencer[], int stepCounter, int seekVal, int randomOn, int seekSet)                                //steps is all the sound/MIDI that has to happen per step
+{
+  //Serial.println(midiSequencer[stepCounter])
+      
+      if(sequencer[stepCounter] == 1)                                                                                                    //if step is on, play files/MIDI
+      {
+        if(randomOn == true) {playSdWav1.seek("vtc.WAV", seekVal);}                                                                      //if randomness on/off play from random or set point
+        if(randomOn == false) {playSdWav1.seek("vtc.WAV", seekSet);}
+        usbMIDI.sendNoteOn(midiSequencer[stepCounter],127,1);
+        prevMidiVal = midiSequencer[stepCounter];                                                                                        //save current MIDI to a memory space
+        if(midiSequencer[(stepCounter+1)] != 0 && midiSequencer[(stepCounter+1)] != prevMidiVal) {usbMIDI.sendNoteOff(prevMidiVal,0,1);} //if there's a different note upcoming, send note off
+        if(midiSequencer[(stepCounter+1)] == 0) {usbMIDI.sendNoteOff(prevMidiVal,0,1);}                                                  //if the next note is a 0, send a note of
+        //Serial.println(midiSequencer[stepCounter]);
+        
+      }
+
+      if(sequencer[stepCounter] == 2)                                                                                                    //On continued-step, send note off
+      {                                                                                                                                  //Still debating the usefullness of this
+          if(midiSequencer[(stepCounter)] == 0) 
+          {usbMIDI.sendNoteOff(prevMidiVal,0,1);}
+      }
+      
+      else if(sequencer[stepCounter] == 0)                                                                                               //On an off-step, stop wav and send note off
+      {playSdWav1.stop(); usbMIDI.sendNoteOff(prevMidiVal,0,1); /*Serial.println(prevMidiVal+",0,1");*/}
+}
+//-----------------------------------------------------------------------------------------------------------------------------clock function here
+void looper(int arraySize, int zigZag, int memoryArray[], int remember, int rememberFlag, int randomOn, int seekSet)                     //Looper is the iterator function. It's basically
+{                                                                                                                                        //two for loops. One counts up and one counts 
+    for(int i = 0; i < arraySize; i++)                                                                                                   //backwards.
+    {
+      //call here for once every step
+      if(remember == true)                                                                                                               //if loop memory is on, call steps with seekVal 
+      {                                                                                                                                  //being a position in the memory array.
+        seekVal = memoryArray[i];                                                                                                       
+        steps(sequencer, midiSequencer, i, seekVal, randomOn, seekSet);
+        //Serial.println("-----");
+        //Serial.println(memoryArray[i]);
+      }
+      
+      if(remember == false)                                                                                                             //if loop memory is off, let seekVal be randomly
+      {                                                                                                                                 //generated each sep.
+        seekVal = random(lowerRandom, upperRandom);
+        steps(sequencer, midiSequencer, i, seekVal, randomOn, seekSet);
+      }
+        delay(tempoMs);
+    }
+    
+//-------------------------------------------------------------------------------reverse playing from here down to...  
+    if(zigZag == true)                                                                                                                  //Do this whole process in reverse if Zigzag 
+    {                                                                                                                                   //sequencing is turned on
+        for(int i = arraySize; i > 0; i--)
+        {
+         //call here for once every step
+          if(remember == true)
+          {
+            seekVal = memoryArray[i];
+            steps(sequencer, midiSequencer, i, seekVal, randomOn, seekSet);
+          }
+          
+          if(remember == false)
+          {
+            seekVal = random(lowerRandom, upperRandom);
+            steps(sequencer, midiSequencer, i, seekVal, randomOn, seekSet);
+          }
+            delay(tempoMs);
+        }
+    }
+}
+//---------------------------------------------------------------------------------...here. Memory array sequence from here on
+void sequenceMemory(void)
+{
+  for(int j = 0; j < arraySize; j++)                                                                                                   //Step through the allocated memory and assign it all
+  {memoryArray[j] = random(lowerRandom, upperRandom);                                                                                  //random numbers
+  Serial.println(memoryArray[j]);}
+}
+
+
