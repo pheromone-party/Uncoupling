@@ -1,0 +1,62 @@
+
+#include <Wire.h>
+#include <SPI.h>
+#include <SD.h>
+#include <SerialFlash.h>
+#include <Audio.h>
+
+AudioPlaySdWav           playSdWav1;
+AudioOutputI2S           i2s1;
+AudioConnection          patchCord1(playSdWav1, 0, i2s1, 0);
+AudioConnection          patchCord2(playSdWav1, 1, i2s1, 1);
+AudioControlSGTL5000     sgtl5000_1;
+
+// Use these with the Teensy Audio Shield
+//#define SDCARD_CS_PIN    10
+//#define SDCARD_MOSI_PIN  7
+//#define SDCARD_SCK_PIN   14
+
+// Use these with the Teensy 3.5 & 3.6 SD card
+#define SDCARD_CS_PIN    BUILTIN_SDCARD
+#define SDCARD_MOSI_PIN  11  // not actually used
+#define SDCARD_SCK_PIN   13  // not actually used
+
+// Use these for the SD+Wiz820 or other adaptors
+//#define SDCARD_CS_PIN    4
+//#define SDCARD_MOSI_PIN  11
+//#define SDCARD_SCK_PIN   13
+// Variables will change:
+int ledState = LOW;             // ledState used to set the LED
+long previousMillis = 0;        // will store last time LED was updated
+
+// the follow variables is a long because the time, measured in miliseconds,
+// will quickly become a bigger number than can be stored in an int.
+long interval = 1000;           // interval at which to blink (milliseconds)
+
+int seekArray[] = {3000, 5001, 6000, 7000, 8000, 9000, 10000, 11000};
+
+void setup() {
+  Serial.begin(9600);
+  AudioMemory(8);
+  sgtl5000_1.enable();
+  sgtl5000_1.volume(0.5);
+  SPI.setMOSI(SDCARD_MOSI_PIN);
+  SPI.setSCK(SDCARD_SCK_PIN);
+  if (!(SD.begin(SDCARD_CS_PIN))) {
+    while (1) {
+      Serial.println("Unable to access the SD card");
+      delay(500);
+    }
+  }
+  delay(1000);
+}
+
+void loop() {
+  if (playSdWav1.isPlaying() == false) {
+    Serial.println("Start playing");
+    playSdWav1.seek("tina3.WAV", 2499);
+    delay(23); // wait for library to parse WAV info
+  }
+  for(int i = 0; i < playSdWav1.lengthMillis(); i++) {playSdWav1.seek((2500 + (i + 100))); delay(100);}
+}
+
